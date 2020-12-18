@@ -23,3 +23,16 @@ def IoU(true_box, predited_box):
     
     # Intersection over union
     return I / U
+    
+    
+def boites_voisines(boite: (int, int, int, int), image_dim: (int, int), pas:int = 5):
+    """ Construit un itérateur sur des variations de la boite.
+    @param image_dim: dimensions de l'image à ne pas déborder
+    """
+    for dx in (-1, 0, 1):
+        for dy in (-1, 0, 1):
+            for dw in (-1, 0, 1):
+                for dh in (-1, 0, 1):
+                    r = (boite[0] + dx * pas, boite[1] + dy * pas, boite[2] + dw * pas, boite[3] + dh * pas)
+                    if r[0] >= 0 and r[1] >= 0 and r[0] + r[2] < image_dim[0] and r[0] + r[3] < image_dim[1]:
+                        yield r

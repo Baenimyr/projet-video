@@ -34,5 +34,5 @@ def boites_voisines(boite: (int, int, int, int), image_dim: (int, int), pas:int 
             for dw in (-1, 0, 1):
                 for dh in (-1, 0, 1):
                     r = (boite[0] + dx * pas, boite[1] + dy * pas, boite[2] + dw * pas, boite[3] + dh * pas)
-                    if r[0] >= 0 and r[1] >= 0 and r[0] + r[2] < image_dim[0] and r[0] + r[3] < image_dim[1]:
+                    if r[0] >= 0 and r[1] >= 0 and r[0] + r[2] < image_dim[0] and r[0] + r[3] < image_dim[1] and 0 < r[2] and 0 < r[3]:
                         yield r

@@ -1,9 +1,9 @@
 import math
 
-def IoU(true_box, predited_box):
+def IoU(true_box, predicted_box):
     
     xt, yt, wt, ht = true_box
-    x, y, w, h = predited_box
+    x, y, w, h = predicted_box
     
     # Get the coordinates of the intersection area
     x_start = max(xt, x)

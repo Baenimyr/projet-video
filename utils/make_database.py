@@ -3,23 +3,19 @@ import sys
 import numpy as np
 import glob
 import cv2
+import random
+import tqdm
 
 
 def usage(prog):
     print("Usage: {} video_dir bboxes_dir output_dir".format(prog))
     sys.exit()
 
-num_args=len(sys.argv)
-if (num_args != 4):
-    usage(sys.argv[0])
-video_dir = sys.argv[1]
-bboxes_dir = sys.argv[2]
-output_dir = sys.argv[3]
-
 need_squares = True
 patch_width = 227
 patch_height = 227
 
+ratio_train=0.8
 
 
 def extract_patches(video_filename, bboxes_filename, output_dir, show=False):
@@ -117,12 +113,12 @@ def extract_patches(video_filename, bboxes_filename, output_dir, show=False):
                 patch = frame[y:y+h, x:x+w]
                 resized = cv2.resize(patch, (patch_width, patch_height), interpolation = cv2.INTER_LINEAR) 
                 
-                output_filename=os.path.join(output_dir, os.path.basename(bboxes_filename).replace(".txt", "")+"_{}_{}.png".format(frame_number, i))
-                #print("output_filename=", output_filename)
-                cv2.imwrite(output_filename, resized)
+                filename = os.path.basename(bboxes_filename).replace(".txt", "_{}_{}.png".format(frame_number, i))
 
                 if show:
                     cv2.rectangle(disp, (x, y), (x+w, y+h), (0, 255, 0), 2) 
+                else:
+                    cv2.imwrite(os.path.join(output_dir, filename), resized)
 
         if show:
             cv2.imshow('frame', disp)
@@ -133,16 +129,7 @@ def extract_patches(video_filename, bboxes_filename, output_dir, show=False):
     cap.release()
 
 
-
-ratio_train=0.8
-
-
-train_dir=os.path.join(output_dir, "train")
-test_dir=os.path.join(output_dir, "test")
-os.mkdir(train_dir)
-os.mkdir(test_dir)
-
-for category in ["Bowl", "CanOfCocaCola", "MilkBottle", "Rice", "Sugar"]:
+def extract_for_category(video_dir: str, bboxes_dir: str, train_dir: str, test_dir: str, category: str):
     bboxes_files = sorted(glob.glob(os.path.join(bboxes_dir, category+"*_2_bboxes.txt")))
 
     #Some objects are present in just one place.
@@ -151,13 +138,16 @@ for category in ["Bowl", "CanOfCocaCola", "MilkBottle", "Rice", "Sugar"]:
     category_train_dir = os.path.join(train_dir, category)
     category_test_dir = os.path.join(test_dir, category)
     
-    os.mkdir(category_train_dir)
-    os.mkdir(category_test_dir)
+    if not os.path.exists(category_train_dir):
+        os.mkdir(category_train_dir)
+    if not os.path.exists(category_test_dir):
+        os.mkdir(category_test_dir)
     
     
     train_files = []
     test_files = []
     
+    """
     h_places={}
     for bboxes_file in bboxes_files:
         bb_file = os.path.basename(bboxes_file)
@@ -169,6 +159,7 @@ for category in ["Bowl", "CanOfCocaCola", "MilkBottle", "Rice", "Sugar"]:
             h_places[place].append(bb_file)
         else:
             h_places[place] = [bb_file]
+    
     for p in h_places:
         files = h_places[p]
         num=len(files)
@@ -181,19 +172,37 @@ for category in ["Bowl", "CanOfCocaCola", "MilkBottle", "Rice", "Sugar"]:
                 train_files.append(os.path.join(bboxes_dir, files[i]))
             for i in range(num_train,num):
                 test_files.append(os.path.join(bboxes_dir, files[i]))
+    """
 
-    for bbox_file in train_files:
-        video_filename = os.path.join(video_dir, os.path.basename(bbox_file).replace("_2_bboxes.txt", ".mp4"))
+    for bboxes_file in bboxes_files:
+        bname = os.path.basename(bboxes_file)
+        train_files.append((bboxes_file, os.path.join(video_dir, bname.replace("_2_bboxes.txt", ".mp4"))))
+
+    for bbox_file, video_filename in tqdm.tqdm(train_files, desc=category):
         if not os.path.exists(video_filename):
             print("ERROR: video file not found:", video_filename)
-            sys.exit()
-        extract_patches(video_filename, bbox_file, category_train_dir)
-
-    for bbox_file in test_files:
-        video_filename = os.path.join(video_dir, os.path.basename(bbox_file).replace("_2_bboxes.txt", ".mp4"))
-        if not os.path.exists(video_filename):
-            print("ERROR: video file not found:", video_filename)
-            sys.exit()
-        extract_patches(video_filename, bbox_file, category_test_dir)
+            sys.exit(1)
+        # séparation par fichier pour obtenir des objets test jamais vu à l'entraînement
+        if random.random() < ratio_train:
+            extract_patches(video_filename, bbox_file, category_train_dir)
+        else:
+            extract_patches(video_filename, bbox_file, category_test_dir)
 
         
+if __name__ == "__main__":
+    num_args=len(sys.argv)
+    if (num_args != 4):
+        usage(sys.argv[0])
+    video_dir = sys.argv[1]
+    bboxes_dir = sys.argv[2]
+    output_dir = sys.argv[3]
+
+    train_dir=os.path.join(output_dir, "train")
+    test_dir=os.path.join(output_dir, "test")
+    if not os.path.exists(train_dir):
+        os.mkdir(train_dir)
+    if not os.path.exists(test_dir):
+        os.mkdir(test_dir)
+
+    for category in ["Bowl", "CanOfCocaCola", "MilkBottle", "Rice", "Sugar"]:
+        extract_for_category(video_dir, bboxes_dir, train_dir, test_dir, category)
